@@ -27,27 +27,10 @@ module CanCan
         end
       end
 
-      def tableized_conditions(conditions, model_class = @model_class)
-        return conditions unless conditions.kind_of? Hash
-        conditions.inject({}) do |result_hash, (name, value)|
-          if value.kind_of? Hash
-            value = value.dup
-            association_class = model_class.reflect_on_association(name).klass.name.constantize
-            nested = value.inject({}) do |nested,(k,v)|
-              if v.kind_of? Hash
-                value.delete(k)
-                nested[k] = v
-              else
-                result_hash[model_class.reflect_on_association(name).table_name.to_sym] = value
-              end
-              nested
-            end
-            result_hash.merge!(tableized_conditions(nested,association_class))
-          else
-            result_hash[name] = value
-          end
-          result_hash
-        end
+      def tableized_conditions(conditions)
+        scope = joined_scope
+        table_aliases = build_table_aliases(scope)
+        tableize_conditions(conditions, table_aliases, [])
       end
 
       # Returns the associations used in conditions for the :joins option of a search.
@@ -75,6 +58,69 @@ module CanCan
       end
 
       private
+
+      def tableize_conditions(conditions, table_aliases, current_nesting)
+
+        return conditions unless conditions.kind_of? Hash
+        conditions.inject({}) do |result_hash, (name, value)|
+          if value.kind_of? Hash
+            new_nesting = current_nesting + [name]
+            table_name = table_name_for_nesting(new_nesting, table_aliases)
+            nested_conditions = {}
+            current_conditions = {}
+
+            value.each do |(k,v)|
+              if v.kind_of? Hash
+                nested_conditions[k] = v
+              else
+                current_conditions[k] = v
+              end
+            end
+            result_hash[table_name] = current_conditions unless current_conditions.empty?
+            result_hash.merge!(tableize_conditions(nested_conditions, table_aliases, new_nesting))
+          else
+            result_hash[name] = value
+          end
+          result_hash
+        end
+      end
+
+      def table_name_for_nesting(nesting, table_aliases)
+        keypath = nesting.join('.')
+        table_aliases.fetch(keypath) { fail ArgumentError }
+      end
+
+      # As of rails 4, `includes()` no longer causes active record to
+      # look inside the where clause to decide to outer join tables
+      # you're using in the where. Instead, `references()` is required
+      # in addition to `includes()` to force the outer join.
+      def build_relation(*where_conditions)
+        joined_scope.where(*where_conditions)
+      end
+
+      def joined_scope
+        relation = @model_class.all
+        relation = relation.includes(joins).references(joins) if joins.present?
+        relation
+      end
+
+      def build_table_aliases(scope)
+        aliases = {}
+        build_table_alias(build_join_dependency_root(scope), aliases, [])
+        aliases
+      end
+
+      def build_table_alias(join_part, aliases, nesting)
+        join_part.children.each do |join_child|
+          new_nesting = nesting + [join_child.name]
+          aliases[new_nesting.join('.')] = join_child.aliased_table_name.to_sym
+          build_table_alias(join_child, aliases, new_nesting)
+        end
+      end
+
+      def build_join_dependency_root(scope)
+        scope.send(:construct_join_dependency, scope.joins_values).join_root
+      end
 
       def mergeable_conditions?
         @rules.find {|rule| rule.unmergeable? }.blank?
