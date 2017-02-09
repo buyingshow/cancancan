@@ -12,7 +12,7 @@ module CanCan
     end
 
     def self.before_callback_name(options)
-      if ActiveSupport.respond_to?(:version) && ActiveSupport.version >= Gem::Version.new("4")
+      if ActiveSupport.respond_to?(:version) && ActiveSupport.version >= Gem::Version.new('4')
         options.delete(:prepend) ? :prepend_before_action : :before_action
       else
         options.delete(:prepend) ? :prepend_before_filter : :before_filter
@@ -24,9 +24,9 @@ module CanCan
       @params = controller.params
       @options = args.extract_options!
       @name = args.first
-      raise CanCan::ImplementationRemoved, "The :nested option is no longer supported, instead use :through with separate load/authorize call." if @options[:nested]
-      raise CanCan::ImplementationRemoved, "The :name option is no longer supported, instead pass the name as the first argument." if @options[:name]
-      raise CanCan::ImplementationRemoved, "The :resource option has been renamed back to :class, use false if no class." if @options[:resource]
+      raise CanCan::ImplementationRemoved, 'The :nested option is no longer supported, instead use :through with separate load/authorize call.' if @options[:nested]
+      raise CanCan::ImplementationRemoved, 'The :name option is no longer supported, instead pass the name as the first argument.' if @options[:name]
+      raise CanCan::ImplementationRemoved, 'The :resource option has been renamed back to :class, use false if no class.' if @options[:resource]
     end
 
     def load_and_authorize_resource
@@ -35,31 +35,28 @@ module CanCan
     end
 
     def load_resource
-      unless skip?(:load)
-        if load_instance?
-          self.resource_instance ||= load_resource_instance
-        elsif load_collection?
-          self.collection_instance ||= load_collection
-        end
+      return if skip?(:load)
+      if load_instance?
+        self.resource_instance ||= load_resource_instance
+      elsif load_collection?
+        self.collection_instance ||= load_collection
       end
     end
 
     def authorize_resource
-      unless skip?(:authorize)
-        @controller.authorize!(authorization_action, resource_instance || resource_class_with_parent)
-      end
+      return if skip?(:authorize)
+      @controller.authorize!(authorization_action, resource_instance || resource_class_with_parent)
     end
 
     def parent?
-      @options.has_key?(:parent) ? @options[:parent] : @name && @name != name_from_controller.to_sym
+      @options.key?(:parent) ? @options[:parent] : @name && @name != name_from_controller.to_sym
     end
 
     def skip?(behavior)
-      return false unless options = @controller.class.cancan_skipper[behavior][@name]
-
+      return false unless (options = @controller.class.cancan_skipper[behavior][@name])
       options == {} ||
-      options[:except] && !action_exists_in?(options[:except]) ||
-      action_exists_in?(options[:only])
+        options[:except] && !action_exists_in?(options[:except]) ||
+        action_exists_in?(options[:only])
     end
 
     protected
@@ -98,7 +95,7 @@ module CanCan
     end
 
     def initial_attributes
-      current_ability.attributes_for(@params[:action].to_sym, resource_class).delete_if do |key, value|
+      current_ability.attributes_for(@params[:action].to_sym, resource_class).delete_if do |key, _value|
         resource_params && resource_params.include?(key)
       end
     end
@@ -106,18 +103,16 @@ module CanCan
     def find_resource
       if @options[:singleton] && parent_resource.respond_to?(name)
         parent_resource.send(name)
-      else
-        if @options[:find_by]
-          if resource_base.respond_to? "find_by_#{@options[:find_by]}!"
-            resource_base.send("find_by_#{@options[:find_by]}!", id_param)
-          elsif resource_base.respond_to? "find_by"
-            resource_base.send("find_by", { @options[:find_by].to_sym => id_param })
-          else
-            resource_base.send(@options[:find_by], id_param)
-          end
+      elsif @options[:find_by]
+        if resource_base.respond_to? "find_by_#{@options[:find_by]}!"
+          resource_base.send("find_by_#{@options[:find_by]}!", id_param)
+        elsif resource_base.respond_to? 'find_by'
+          resource_base.send('find_by', @options[:find_by].to_sym => id_param)
         else
-          adapter.find(resource_base, id_param)
+          resource_base.send(@options[:find_by], id_param)
         end
+      else
+        adapter.find(resource_base, id_param)
       end
     end
 
@@ -146,7 +141,7 @@ module CanCan
     end
 
     def member_action?
-      new_actions.include?(@params[:action].to_sym) || @options[:singleton] || ( (@params[:id] || @params[@options[:id_param]]) && !collection_actions.include?(@params[:action].to_sym))
+      new_actions.include?(@params[:action].to_sym) || @options[:singleton] || ((@params[:id] || @params[@options[:id_param]]) && !collection_actions.include?(@params[:action].to_sym))
     end
 
     # Returns the class used for this resource. This can be overriden by the :class option.
@@ -162,7 +157,7 @@ module CanCan
     end
 
     def resource_class_with_parent
-      parent_resource ? {parent_resource => resource_class} : resource_class
+      parent_resource ? { parent_resource => resource_class } : resource_class
     end
 
     def resource_instance=(instance)
@@ -228,10 +223,10 @@ module CanCan
 
     def resource_params
       if parameters_require_sanitizing? && params_method.present?
-        return case params_method
-          when Symbol then @controller.send(params_method)
-          when String then @controller.instance_eval(params_method)
-          when Proc then params_method.call(@controller)
+        case params_method
+        when Symbol then @controller.send(params_method)
+        when String then @controller.instance_eval(params_method)
+        when Proc then params_method.call(@controller)
         end
       else
         resource_params_by_namespaced_name
@@ -243,9 +238,9 @@ module CanCan
     end
 
     def resource_params_by_namespaced_name
-      if @options[:instance_name] && @params.has_key?(extract_key(@options[:instance_name]))
+      if @options[:instance_name] && @params.key?(extract_key(@options[:instance_name]))
         @params[extract_key(@options[:instance_name])]
-      elsif @options[:class] && @params.has_key?(extract_key(@options[:class]))
+      elsif @options[:class] && @params.key?(extract_key(@options[:class]))
         @params[extract_key(@options[:class])]
       else
         @params[extract_key(namespaced_name)]
@@ -270,7 +265,7 @@ module CanCan
     end
 
     def namespaced_name
-      ([namespace, name] * '/').singularize.camelize.safe_constantize || name
+      [namespace, name].join('/').singularize.camelize.safe_constantize || name
     end
 
     def name_from_controller
@@ -300,7 +295,7 @@ module CanCan
     end
 
     def extract_key(value)
-       value.to_s.underscore.gsub('/', '_')
+      value.to_s.underscore.tr('/', '_')
     end
   end
 end

@@ -1,5 +1,4 @@
 module CanCan
-
   # This module is designed to be included into an Ability class. This will
   # provide the "can" methods for defining and checking abilities.
   #
@@ -68,6 +67,7 @@ module CanCan
       end.reject(&:nil?).first
       match ? match.base_behavior : false
     end
+
     # Convenience method which works the same as "can?" but returns the opposite value.
     #
     #   cannot? :destroy, @project
@@ -208,7 +208,7 @@ module CanCan
     # See ControllerAdditions#authorize! for documentation.
     def authorize!(action, subject, *args)
       message = nil
-      if args.last.kind_of?(Hash) && args.last.has_key?(:message)
+      if args.last.is_a?(Hash) && args.last.key?(:message)
         message = args.pop[:message]
       end
       if cannot?(action, subject, *args)
@@ -220,9 +220,9 @@ module CanCan
 
     def unauthorized_message(action, subject)
       keys = unauthorized_message_keys(action, subject)
-      variables = {:action => action.to_s}
+      variables = { action: action.to_s }
       variables[:subject] = (subject.class == Class ? subject : subject.class).to_s.underscore.humanize.downcase
-      message = I18n.translate(nil, variables.merge(:scope => :unauthorized, :default => keys + [""]))
+      message = I18n.translate(nil, variables.merge(scope: :unauthorized, default: keys + ['']))
       message.blank? ? nil : message
     end
 
@@ -260,12 +260,12 @@ module CanCan
     #     action: array_of_objects
     #   }
     def permissions
-      permissions_list = {:can => {}, :cannot => {}}
+      permissions_list = { can: {}, cannot: {} }
 
       rules.each do |rule|
         subjects = rule.subjects
         expand_actions(rule.actions).each do |action|
-          if(rule.base_behavior)
+          if rule.base_behavior
             permissions_list[:can][action] ||= []
             permissions_list[:can][action] += subjects.map(&:to_s)
           else
@@ -289,7 +289,7 @@ module CanCan
     private
 
     def unauthorized_message_keys(action, subject)
-      subject = (subject.class == Class ? subject : subject.class).name.underscore unless subject.kind_of? Symbol
+      subject = (subject.class == Class ? subject : subject.class).name.underscore unless subject.is_a? Symbol
       [subject, :all].map do |try_subject|
         [aliases_for_action(action), :manage].flatten.map do |try_action|
           :"#{try_action}.#{try_subject}"
@@ -319,7 +319,7 @@ module CanCan
 
     # It translates to an array the subject or the hash with multiple subjects given to can?.
     def extract_subjects(subject)
-      if subject.kind_of?(Hash) && subject.key?(:any)
+      if subject.is_a?(Hash) && subject.key?(:any)
         subject[:any]
       else
         [subject]
@@ -374,13 +374,12 @@ module CanCan
     def optimize_order!(rules)
       first_can_in_group = -1
       rules.each_with_index do |rule, i|
-        (first_can_in_group = -1) and next unless rule.base_behavior
-        (first_can_in_group = i) and next if first_can_in_group == -1
-        if rule.subjects == [:all]
-          rules[i] = rules[first_can_in_group]
-          rules[first_can_in_group] = rule
-          first_can_in_group += 1
-        end
+        (first_can_in_group = -1) && next unless rule.base_behavior
+        (first_can_in_group = i) && next if first_can_in_group == -1
+        next unless rule.subjects == [:all]
+        rules[i] = rules[first_can_in_group]
+        rules[first_can_in_group] = rule
+        first_can_in_group += 1
       end
     end
 
@@ -412,9 +411,9 @@ module CanCan
 
     def default_alias_actions
       {
-        :read => [:index, :show],
-        :create => [:new],
-        :update => [:edit],
+        read: [:index, :show],
+        create: [:new],
+        update: [:edit]
       }
     end
   end
